@@ -3,14 +3,29 @@ const cheerio = require("cheerio");
 const { route, router } = require("bottender/router");
 
 exports.stickerRoute = (context, props) => {
-  return router([route()]);
+  if (!context.event.isSticker) return props.next;
+  return router([route(() => true, copySticker)]);
 };
+
+async function copySticker(context) {
+  let { packageId } = context.event.sticker;
+  let stickerInfo = await getStickerInfo(packageId);
+
+  if (stickerInfo === null) {
+    context.sendText("無法存取此貼圖的資訊！");
+    return;
+  }
+
+  context.sendText(
+    `#新增指令 ${stickerInfo.title} https://stickershop.line-scdn.net/stickershop/v1/sticker/${stickerInfo.prefix}{${stickerInfo.min},${stickerInfo.max}}/android/sticker.png`
+  );
+}
 
 /**
  * 根據貼圖包id取得內容資訊
- * @param {String} packgeId
+ * @param {String} packageId
  */
-function getStickerInfo(packgeId) {
+function getStickerInfo(packageId) {
   let stampUrl = `https://store.line.me/stickershop/product/${packageId}/zh-Hant?from=sticker`;
   return axios
     .get(stampUrl, {
@@ -22,6 +37,9 @@ function getStickerInfo(packgeId) {
     .then(res => res.data)
     .then(body => {
       const $ = cheerio.load(body);
+      let elNotSale = $("p[data-test='not-on-sale-description']");
+      if (elNotSale.length !== 0) return null;
+
       let title = $("p[data-test=sticker-name-title]").text();
       let stamps = [];
       let images = $("div.FnImage");
@@ -44,6 +62,7 @@ function getStickerInfo(packgeId) {
 /**
  * 取得貼圖範圍
  * @param {Array<String>} stamps
+ * @returns {<{max: String, min: String, prefix: String}>}
  */
 function _getStickerRange(stamps) {
   let [max, min] = [stamps[0], stamps[stamps.length - 1]];

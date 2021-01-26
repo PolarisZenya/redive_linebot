@@ -10,6 +10,7 @@ const statistics = require("./middleware/statistics");
 const lineEvent = require("./controller/lineEvent");
 const welcome = require("./templates/common/welcome");
 const config = require("./middleware/config");
+const orderTrans = require("./middleware/orderTrans");
 const groupTemplate = require("./templates/application/Group/line");
 const { GlobalOrderBase } = require("./controller/application/GlobalOrders");
 const { showAnnounce } = require("./controller/princess/announce");
@@ -23,6 +24,8 @@ const traffic = require("./util/traffic");
 const { showManagePlace } = require("./templates/application/Admin");
 const { sendPreWorkMessage } = require("./templates/princess/other");
 const { pushMessage } = require("./util/LineNotify");
+const { stickerRoute } = require("./controller/application/StickerController");
+const { store } = require("./model/application/OnceOrderModel");
 
 function showState(context) {
   context.sendText(JSON.stringify(context.state));
@@ -83,7 +86,10 @@ async function OrderBased(context, { next }) {
     text(/^[.#]自訂頭像( (?<param1>\S+))?( (?<param2>\S+))?/, guildConfig.setSender),
     text("#我的狀態", ChatLevelController.showStatus),
     text("#等級排行", ChatLevelController.showRank),
-    text(".test", () => pushMessage({ message: "test", token: process.env.LINE_NOTIFY_TOKEN })),
+    text(/[.]test (?<message>[\s\S]+)/, (context, param) => {
+      let { message } = param.match.groups;
+      store(message).then(console.log);
+    }),
     route("*", next),
   ]);
 }
@@ -207,11 +213,13 @@ async function App(context) {
     statistics, // 數據蒐集
     lineEvent, // 事件處理
     config, // 設置群組設定檔
+    orderTrans,
     transfer, // Discord Webhook轉發
     HandlePostback, // 處理postback事件
     GlobalOrderBase, // 全群指令分析
     OrderBased, // 指令分析
     CustomerOrderBased, // 自訂指令分析
+    stickerRoute,
     Nothing, // 無符合事件
   ]);
 }
